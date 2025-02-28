@@ -1,162 +1,196 @@
 # Project Penney
 
 ## Overview
-Penney's Game is played by two players and one deck of cards. Each player chooses a three-card sequence of colors (i.e. Red or Black) and cards are drawn face-up until one of the selected sequences appear (i.e. RRR, or BRB). Penney's game has two variations. 
+Penney's Game is played by two players and one deck of cards. Each player chooses a three-card sequence of colors (i.e., Red or Black) and cards are drawn face-up until one of the selected sequences appears (e.g., RRR, or BRB). Penney's Game has two variations.
 
-The **first variation** tallies the **total number of cards** from the initial draw until a chosen sequence appears. All cards in the pile are given to the player whose sequence appears. This is repeated until the deck runs out; any cards remaining in the pile at the end are not tallied.
+The **first variation** tallies the **total number of cards** from the initial draw until a chosen sequence appears. All cards in the pile are awarded to the player whose sequence is detected. The process repeats until the deck is exhausted; any remaining cards in the pile are discarded.
 
-The **second variation** counts the **number of "tricks" a player scores** in a game. Each time a player's sequence appears, their number of tricks increases by 1, repeated until the deck runs out.
+The **second variation** counts the **number of tricks** a player scores. Each time a player's sequence appears, their trick count increases by 1. This variation continues until the deck runs out.
 
-Below, you may read the documentation on how our group approached simulating the game, managing/storing our data, and visualizing our data as a heatmap. The project includes four files:
+Below, you can find details on how the project simulates the game, manages and stores our simulation data, and produces heatmaps for visual insights. The repository is organized into dedicated modules for data generation, management, and visualization, along with main scripts to run the simulation pipeline:
 
-- `RunSimulation.py`
-- `DataManagement.py`
-- `DataVisualization.py`
-- `RunEverything.ipynb`
+- `src/DataGeneration/DataGen.py`
+- `src/Management/ProcessData.py`
+- `src/Visualization/Visualization.py`
+- `Penney.py`
+- `RunSimExample.py`
 
-## RunSimulation.py
-The RunSimulation file will simulate the shuffling of decks of cards and save the results as a `.npy` file.
+## src/DataGeneration/DataGen.py
+This module is responsible for generating shuffled decks of cards used in the simulations.
 
-`generate_simulation_results(num_iter, output_filename, path)`
+**Function:** `get_decks(n_decks, seed, half_deck_size, append=False)`
 
 Parameters:
-- `num_iter` (`int`): the number of decks to create
-- `output_filename` (`str`): the file to save the decks in
-- `seed`: the seed to use for random generation
-- `path` (`str`, optional): the path to save the file in. Defaults to `'data'`
+- `n_decks` (int): Number of decks to generate.
+
+- `seed` (int): Seed for random number generation.
+
+- `half_deck_size` (int): Number of cards in each half-deck (default is 26, forming a 52-card deck).
+
+- `append` (bool): Indicates whether to append new decks to an existing simulation file.
 
 Functionality:
-- Creates decks of red and black cards, represented by 52 bits, where `0` is red and `1` is black.
-- The 52 bits are shuffled, to represent a random deck with 26 black and 26 red cards.
-- Saves the decks as integers and stores them in a `.npy` file.
+- Creates the "data" directory if it does not exist.
+
+- Generates decks by using NumPy to create an array containing 26 instances of `0` (one color) and 26 instances of `1` (the other color), then shuffles each deck.
+
+- Supports appending to previous simulation data by restoring the random number generator (RNG) state from a JSON file, ensuring continuity between simulation runs.
+
+- Saves the decks in a `.npy` file and also stores the current RNG state for future appending.
+
+- Returns the file path of the saved decks.
+
+This function forms the foundation of the simulation by ensuring that the decks are randomized reproducibly, reflecting the inherent randomness of Penney’s Game.
+
+---
+
+## src/Management/ProcessData.py
+This module processes the simulation data, providing functions to load decks and analyze them using both game variations.
+
+**Function**: `load_simulation(file_path)`
+
+Parameter:
+- `file_path` (str): Path to the `.npy` file containing deck data.
+
+  
+Functionality:
+- Checks if the specified file exists.
+- Loads the deck data into a NumPy array from the `.npy` file for further simulation analysis.
+
+
+**Function**: `cards(decks, player1_sequence, player2_sequence)`
+
+Parameters:
+- `decks` (np.ndarray): Array of decks generated from the simulation.
+- `player1_sequence` (str): Three-digit binary sequence selected by player 1.
+- `player2_sequence` (str): Three-digit binary sequence selected by player 2.
+
+Functionality:
+- Iterates through each deck to simulate the pile-based scoring approach.
+
+- Detects the occurrence of player sequences by examining every possible contiguous 3-card window.
+
+- When a sequence match is found, awards the accumulated cards (plus additional fixed points) and resets the pile.
+
+- Returns arrays with the cumulative card scores for player 1 and player 2 respectively.
+
+**Function**: `tricks(decks, player1_sequence, player2_sequence)`
+
+Parameters: As in the `cards` function.
+
+Functionality:
+- Similar to cards, but instead of tallying cards, counts each occurrence of a player's sequence as a "trick."
+
+- Increments the trick counter every time a matching sequence is detected.
+
+- Returns arrays containing the trick counts for player 1 and player 2.
+
+**Function**: `all_combinations(decks)`
+
+Parameter:
+- `decks` (np.ndarray): Array of simulation decks.
+
+Functionality:
+- Generates all possible distinct pairs of 3-bit sequences (e.g., '000', '001', … '111').
+
+- For each pair, simulates both the cards and tricks variations across all decks.
+
+- Computes win counts and calculates Player 1 win percentages.
+
+- Aggregates the results into two Pandas DataFrames – one for each variation.
+
+- Utilizes tqdm to provide a progress bar during this potentially time-intensive computation.
+
+This module offers a comprehensive processing pipeline that enables the analysis of every possible matchup between player sequences, mirroring the game’s strategic depth.
 
 
 ---
 
-## DataManagement.py
-The DataManagement file has several functions associated with storing and processing data for visualization purposes.
-
-`load_process_simulations(path)`
-
-Parameter:
-- `path` (`str`): the location of the simulation data from the previous step
-
-  
-Functionality:
-- Loads simulation data from specified file
-- Converts each integer in file to 52-bit binary string
-- Returns a list of the binary strings
-
-
-`variation1`
-
-Parameters:
-- `deck` (`str`): deck of cards as binary sequence
-- `player1_sequence` (`str`): 3-bit sequence for player 1
-- `player2_sequence` (`str`): 3-bit sequence for player 2
-
-Functionality:
-- Initialize card counts and pile size
-- Iterates through the deck to check for matches with player sequences
-- If match is found, matching player receives cards in pile
-- Returns `player1_cards, player2_cards`: the number of **cards** collected by each player
-
-`variation2`
-
-Parameters:
-- `deck` (`str`): deck of cards as binary sequence
-- `player1_sequence` (`str`): 3-bit sequence for player 1
-- `player2_sequence` (`str`): 3-bit sequence for player 2
-
-Functionality:
-- Initialize trick counters for both players
-- Iterates through deck to check for matches with player sequences
-- When a match is found, matching player scores one trick
-- Returns `player1_tricks, player2_tricks`: number of **tricks** won by each player
-
-
-`analyze_all_combinations`
-
-Parameter:
-- `simulations`: list of binary strings representing games
-
-Functionality:
-- Generates all possible player 1 and player 2 sequence combinations 
-- For each unique pair of sequences it simulations both variations of the game for each deck in simulations, counts wins for each player in both variations, and calculates win percentages
-- Compiles results into two DataFrames, one for each variation
-
-
-`combine_past_data`
-
-Parameters:
-- `new_var1` (`pandas.DataFrame`): New simulation data to be added to old data for variation 1.
-- `new_var2` (`pandas.DataFrame`): New simulation data to be added to old data for variation 2.
-- `var1_existing_filename` (`str`): The CSV file containing the old data for variation 1.
-- `var2_existing_filename` (`str`): The CSV file containing the old data for variation 2.
-- `folder` (`str`, optional): Path to the folder containing the CSV files to process. Default is `data`.
-
-  
-Functionality:
-- Initializes combined DataFrames for each variation using existing data
-- Sets ‘Sequence 1’ and ‘Sequence 2’ as index
-- Reads CSVs, ensures sequences are 3 digits long, determines which variation the file belongs to, updates corresponding combined DataFrame using `update_dataframe` function
-- Resets index of combined DataFrames
-- Saves updated DataFrames to CSV files 
-- Returns the two updated DataFrames 
-
-
-`update_dataframe`
-
-
-Parameters:
-- `existing_df` (`pandas.DataFrame`): Existing DataFrame to be updated
-- `new_df` (`pandas.DataFrame`): DataFrame containing data to be merged
-
-
-Functionality:
-- If the existing DataFrame is empty, it returns the new DataFrame
-- Finds common columns between existing and new DataFrames
-- Updates existing DataFrame with values from common columns in new DataFrame
-- Recalculates the ‘Player 1 Win %’ based on updated win counts 
-- Returns updated DataFrame with merged data and recalculated win percentages 
-
-
-
----
-
-## DataVisualization.py
+## src/Visualization/Visualization.py
 
 
 The DataVisualization file helps with generating and saving heatmaps for the probability of player 1 winning for every possible combination of color card sequences.
 
-Note that the **title of the heatmaps contains an approximation** of the amount of games played. This number is taken from one of the variations. It is approximate because ties are dropped from the data, meaning that each game variation may have slightly different amounts of actual finished, non-tying games.
-
-`generate_heatmap`
+**Function**: `generate_heatmaps(cards_data, tricks_data, filename, vmin=0, vmax=100)`
 
 Parameters:
-- `data`: This is the DataFrame that contains the total results
-- `filename`: Name of the file where the heatmap is saved
-- `vmin`, `vmax`: Win percentage value bounds for the color scale in the heatmap
-- `title`: Title text of the heatmap 
+- `cards_data` (pd.DataFrame): Data from the pile-based game variation.
+
+- `tricks_data` (pd.DataFrame): Data from the trick-based game variation.
+
+- `filename` (str): Base name for the output heatmap image files.
+
+- `vmin` (float): Minimum bound for the heatmap color scale.
+
+- `vmax` (float): Maximum bound for the heatmap color scale.
 
 
 Functionality:
 
-- Takes dataframe of the total Penney's game simulation
-- Creates 8 by 8 matrix comparing Player 1 and Player 2
-- Fills the matrix with each of the winning probabilities
-- The heatmap is created after visualizing the annotated 8 by 8 matrix
-- The dark diagonal on the heatmap is set for the sequences that match
-- The heatmap is labeled with proper percentages of player 1 wins for each sequence 
-- Darker colors represent a higher winning probability; lighter colors represent a lower winning probability
+- Converts binary sequences to more visually intuitive labels by replacing 0 with "B" (Black) and 1 with "R" (Red).
+
+- Pivots the simulation results into matrices appropriate for heatmap visualization.
+
+- Generates two separate heatmaps using Seaborn: one displaying the outcomes of the cards variation and another for the tricks variation.
+
+- Configures the heatmaps with annotations, appropriate color scales, and axis labels.
+
+- Saves the heatmaps as high-resolution PNG images in the "figures" directory.
+
+- Returns the Matplotlib figure objects for further inspection or modification.
+
+By transforming raw simulation data into visually accessible formats, this module helps highlight strategic patterns and probabilities inherent in Penney's Game.
 
 ---
 
-## RunEverything.ipynb
-The RunEverything notebook allows you, the FLB, to simply run a few lines of code to add new simulations and produce the resulting heatmaps.
+## Penney.py
+This module serves as the main driver for the simulation pipeline by integrating functions across data generation, management, and visualization.
+
+**Function**:`run_sim(n_decks, seed, half_deck_size=26, append=False, filename="simulation_results", vmin=0, vmax=100)`
+
+Parameters:
+- `n_decks` (int): Number of decks to simulate.
+
+- `seed` (int): Seed for reproducible shuffling.
+
+- `half_deck_size` (int): Number of cards per half-deck.
+
+- `append` (bool): Whether to append to existing simulation data.
+
+- `filename` (str): Base filename for saving heatmaps.
+
+- `vmin`, `vmax` (float): Bounds for the heatmap color scale.
+
+Functionality:
+- Step 1: Generates shuffled decks using get_decks and saves them.
+
+- Step 2: Loads the generated deck data with load_simulation.
+
+- Step 3: Analyzes all possible sequence matchups by calling all_combinations to simulate both game variations.
+
+- Step 4: Produces heatmaps using generate_heatmaps to visually represent the winning probabilities of Player 1.
+
+- Provides progress updates via print statements throughout the execution.
+
+- Returns the Matplotlib figure objects containing the generated heatmaps.
+
+This end-to-end pipeline encapsulates the simulation process, from deck generation through to result visualization, and is key to exploring the strategic dynamics of Penney's Game.
 
 ---
+## RunSimExample.py
+This script demonstrates how to use the simulation pipeline.
 
+Functionality:
+
+- Imports and reloads the Penney module to ensure the latest version is used.
+
+- Executes the simulation by calling run_sim with specific parameters (e.g., simulating 10,000 decks with seed 42).
+
+- Automatically produces and saves the heatmaps, making it easy to generate new simulation results with minimal setup.
+
+You can run this script to quickly generate new simulation data and visualize the patterns observed in Penney’s Game.
+
+---
 
 ## The Goal / Moving Forward
-Looking at the probabilities of the two version of the penney's game, we can see that while there are differences in some of the percentages for player 1 winning, overall the heatmap shows a similar pattern between both games. This may sort of highlight the idea that no matter what variation of the penney's game are played, the same pattern of some sequences having a more or less advantage exists. Based on our heatmaps, there are some clear instances where one type of sequence from player 1 may beat player 2, but collectively we thought that if the type of sequence chosen was privately that brings a lot of random chance into question. Which ever person chooses the optimal sequence at that point is more likely to win. This could also mean that since there are certain sequences that are more likely to win than others, that might lower the choices one player may take in order to have a more likely chance to win overall games played. 
+The heatmaps derived from both versions of Penney's Game indicate that despite slight differences in winning percentages between the two variations, there is a consistent pattern regarding the advantage of particular sequences. This insight supports the idea that even with inherent randomness, some sequences provide a statistically higher chance of winning. Future work will focus on further refining the simulation parameters and exploring additional visualization techniques to deepen our understanding of the strategic aspects of Penney's Game.
