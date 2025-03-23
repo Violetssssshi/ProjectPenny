@@ -149,7 +149,7 @@ def all_combinations(decks: np.ndarray) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     # Process each pair for the cards game (variation1)
     for p1, p2 in tqdm(sequence_pairs, desc="Processing cards game"):
-        p1_wins, p2_wins = 0, 0
+        p1_wins, p2_wins, draws = 0, 0, 0
 
         # Simulate for each deck
         player1_scores, player2_scores = cards(decks, p1, p2)
@@ -158,23 +158,28 @@ def all_combinations(decks: np.ndarray) -> tuple[pd.DataFrame, pd.DataFrame]:
                 p1_wins += 1
             elif p2_score > p1_score:
                 p2_wins += 1
+            else:
+                draws += 1
 
-        # Calculate win percentage for Player 1
-        total_wins = p1_wins + p2_wins
-        win_percentage = (p1_wins / total_wins * 100) if total_wins > 0 else 0
+        # Calculate percentages
+        total_games = p1_wins + p2_wins + draws
+        win_percentage = (p1_wins / total_games * 100) if total_games > 0 else 0
+        tie_percentage = (draws / total_games * 100) if total_games > 0 else 0
 
-        # Append results
+        # Append results with percentages
         results_cards.append({
             "Sequence 1": p1,
             "Sequence 2": p2,
             "Player 1 Wins": p1_wins,
             "Player 2 Wins": p2_wins,
-            "Player 1 Win %": round(win_percentage, 2)
+            "Draws": draws,
+            "Player 1 Win %": round(win_percentage, 2),
+            "Tie %": round(tie_percentage, 2)  # New tie probability
         })
 
     # Process each pair for the tricks game (variation2)
     for p1, p2 in tqdm(sequence_pairs, desc="Processing tricks game"):
-        p1_wins, p2_wins = 0, 0
+        p1_wins, p2_wins, draws = 0, 0, 0
 
         # Simulate for each deck
         player1_tricks, player2_tricks = tricks(decks, p1, p2)
@@ -183,18 +188,23 @@ def all_combinations(decks: np.ndarray) -> tuple[pd.DataFrame, pd.DataFrame]:
                 p1_wins += 1
             elif p2_trick > p1_trick:
                 p2_wins += 1
+            else:
+                draws += 1
 
-        # Calculate win percentage for Player 1
-        total_wins = p1_wins + p2_wins
-        win_percentage = (p1_wins / total_wins * 100) if total_wins > 0 else 0
+        # Calculate percentages
+        total_games = p1_wins + p2_wins + draws
+        win_percentage = (p1_wins / total_games * 100) if total_games > 0 else 0
+        tie_percentage = (draws / total_games * 100) if total_games > 0 else 0
 
-        # Append results
+        # Append results with percentages
         results_tricks.append({
             "Sequence 1": p1,
             "Sequence 2": p2,
             "Player 1 Wins": p1_wins,
             "Player 2 Wins": p2_wins,
-            "Player 1 Win %": round(win_percentage, 2)
+            "Draws": draws,
+            "Player 1 Win %": round(win_percentage, 2),
+            "Tie %": round(tie_percentage, 2)  # New tie probability
         })
 
     # Convert results to Pandas DataFrames
