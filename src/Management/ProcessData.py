@@ -124,96 +124,130 @@ def tricks(decks: np.ndarray, player1_sequence: str, player2_sequence: str) -> t
     
     return player1_tricks, player2_tricks
 
-def all_combinations(decks: np.ndarray) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Tests every possible pair of distinct 3-bit sequences for two players using both game variations (cards and tricks).
-    Aggregates outcomes across all the simulations provided.
+def all_combinations(decks: np.ndarray, seed: int, append: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if append:
+        existing_cards, existing_tricks = load_scoring_data(seed)
+        existing_decks = load_processed_decks_count(seed)
+        new_decks = len(decks) - existing_decks
+        decks_to_process = decks[-new_decks:]
+    else:
+        existing_cards = pd.DataFrame(columns=['Sequence 1', 'Sequence 2', 'Player 1 Wins', 'Player 2 Wins', 'Draws', 'Player 1 Win %', 'Tie %'])
+        existing_tricks = pd.DataFrame(columns=['Sequence 1', 'Sequence 2', 'Player 1 Wins', 'Player 2 Wins', 'Draws', 'Player 1 Win %', 'Tie %'])
+        existing_decks = 0
+        decks_to_process = decks
 
-    Parameters:
-        decks (np.ndarray): An array of decks loaded from the `load_simulation` method.
+    all_sequences = ['{:03b}'.format(i) for i in range(8)]
+    new_cards_results = []
+    new_tricks_results = []
 
-    Returns:
-        tuple[pd.DataFrame, pd.DataFrame]: Two Pandas DataFrames containing aggregated results for the cards and tricks variations.
-    """
-    # Generate all possible 3-bit sequences
-    three_bit_sequences = [''.join(seq) for seq in itertools.product('01', repeat=3)]
+    total_iterations = len(all_sequences) * (len(all_sequences) - 1)
+
+    with tqdm(total=total_iterations, desc="Processing Pairs") as pbar:
+        for p1 in all_sequences:
+            for p2 in all_sequences:
+                if p1 != p2:
+                    p1_wins_cards, p2_wins_cards, draws_cards = 0, 0, 0
+                    p1_wins_tricks, p2_wins_tricks, draws_tricks = 0, 0, 0
+
+                    p1_scores_cards, p2_scores_cards = cards(decks_to_process, p1, p2)
+                    p1_scores_tricks, p2_scores_tricks = tricks(decks_to_process, p1, p2)
+
+                    for s1, s2 in zip(p1_scores_cards, p2_scores_cards):
+                        if s1 > s2:
+                            p1_wins_cards += 1
+                        elif s2 > s1:
+                            p2_wins_cards += 1
+                        else:
+                            draws_cards += 1
+
+                    for s1, s2 in zip(p1_scores_tricks, p2_scores_tricks):
+                        if s1 > s2:
+                            p1_wins_tricks += 1
+                        elif s2 > s1:
+                            p2_wins_tricks += 1
+                        else:
+                            draws_tricks += 1
+
+                    total_games_cards = p1_wins_cards + p2_wins_cards + draws_cards
+                    total_games_tricks = p1_wins_tricks + p2_wins_tricks + draws_tricks
+
+                    new_cards_results.append({
+                        'Sequence 1': p1,
+                        'Sequence 2': p2,
+                        'Player 1 Wins': p1_wins_cards,
+                        'Player 2 Wins': p2_wins_cards,
+                        'Draws': draws_cards,
+                        'Player 1 Win %': round((p1_wins_cards / total_games_cards) * 100, 2) if total_games_cards > 0 else 0,
+                        'Tie %': round((draws_cards / total_games_cards) * 100, 2) if total_games_cards > 0 else 0
+                    })
+
+                    new_tricks_results.append({
+                        'Sequence 1': p1,
+                        'Sequence 2': p2,
+                        'Player 1 Wins': p1_wins_tricks,
+                        'Player 2 Wins': p2_wins_tricks,
+                        'Draws': draws_tricks,
+                        'Player 1 Win %': round((p1_wins_tricks / total_games_tricks) * 100, 2) if total_games_tricks > 0 else 0,
+                        'Tie %': round((draws_tricks / total_games_tricks) * 100, 2) if total_games_tricks > 0 else 0
+                    })
+
+                    pbar.update(1)
+
+    new_cards_df = pd.DataFrame(new_cards_results)
+    new_tricks_df = pd.DataFrame(new_tricks_results)
+
+    final_cards = update_dataframe(existing_cards, new_cards_df)
+    final_tricks = update_dataframe(existing_tricks, new_tricks_df)
+
+    total_decks = existing_decks + len(decks_to_process)
+    save_processed_decks_count(seed, total_decks)
+    save_scoring_data(seed, final_cards, final_tricks)
+
+    return final_cards, final_tricks
+
+
+def load_processed_decks_count(seed: int) -> int:
+    count_file = f"data/processed_decks_count_{seed}.txt"
+    if os.path.exists(count_file):
+        with open(count_file, 'r') as f:
+            return int(f.read())
+    return 0
+
+def save_processed_decks_count(seed: int, count: int):
+    count_file = f"data/processed_decks_count_{seed}.txt"
+    with open(count_file, 'w') as f:
+        f.write(str(count))
+
+
+def update_dataframe(existing_df: pd.DataFrame, new_df: pd.DataFrame) -> pd.DataFrame:
+    if existing_df.empty:
+        return new_df
+
+    existing_df['Sequence 1'] = existing_df['Sequence 1'].apply(lambda x: x.zfill(3))
+    existing_df['Sequence 2'] = existing_df['Sequence 2'].apply(lambda x: x.zfill(3))
+
+    existing_df['Player 1 Wins'] += new_df['Player 1 Wins']
+    existing_df['Player 2 Wins'] += new_df['Player 2 Wins']
+    existing_df['Draws'] += new_df['Draws']
+
+    total_games = existing_df['Player 1 Wins'] + existing_df['Player 2 Wins'] + existing_df['Draws']
+    existing_df['Player 1 Win %'] = (existing_df['Player 1 Wins'] / total_games * 100).fillna(0).round(2)
+    existing_df['Tie %'] = (existing_df['Draws'] / total_games * 100).fillna(0).round(2)
+
+    return existing_df
+
+def save_scoring_data(seed: int, cards_data: pd.DataFrame, tricks_data: pd.DataFrame):
+    os.makedirs("data", exist_ok=True)
+    cards_data.to_csv(f"data/scoring_cards_{seed}.csv", index=False)
+    tricks_data.to_csv(f"data/scoring_tricks_{seed}.csv", index=False)
+
+def load_scoring_data(seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    cards_file = f"data/scoring_cards_{seed}.csv"
+    tricks_file = f"data/scoring_tricks_{seed}.csv"
     
-    # Prepare empty lists for results
-    results_cards = []
-    results_tricks = []
-
-    # Get all distinct pairs of sequences
-    sequence_pairs = [(p1, p2) for p1 in three_bit_sequences for p2 in three_bit_sequences if p1 != p2]
-
-    # Process each pair for the cards game (variation1)
-    for p1, p2 in tqdm(sequence_pairs, desc="Processing cards game"):
-        p1_wins, p2_wins, draws = 0, 0, 0
-
-        # Simulate for each deck
-        player1_scores, player2_scores = cards(decks, p1, p2)
-        for p1_score, p2_score in zip(player1_scores, player2_scores):
-            if p1_score > p2_score:
-                p1_wins += 1
-            elif p2_score > p1_score:
-                p2_wins += 1
-            else:
-                draws += 1
-
-        # Calculate percentages
-        total_games = p1_wins + p2_wins + draws
-        win_percentage = (p1_wins / total_games * 100) if total_games > 0 else 0
-        tie_percentage = (draws / total_games * 100) if total_games > 0 else 0
-
-        # Append results with percentages
-        results_cards.append({
-            "Sequence 1": p1,
-            "Sequence 2": p2,
-            "Player 1 Wins": p1_wins,
-            "Player 2 Wins": p2_wins,
-            "Draws": draws,
-            "Player 1 Win %": round(win_percentage, 2),
-            "Tie %": round(tie_percentage, 2)  # New tie probability
-        })
-
-    # Process each pair for the tricks game (variation2)
-    for p1, p2 in tqdm(sequence_pairs, desc="Processing tricks game"):
-        p1_wins, p2_wins, draws = 0, 0, 0
-
-        # Simulate for each deck
-        player1_tricks, player2_tricks = tricks(decks, p1, p2)
-        for p1_trick, p2_trick in zip(player1_tricks, player2_tricks):
-            if p1_trick > p2_trick:
-                p1_wins += 1
-            elif p2_trick > p1_trick:
-                p2_wins += 1
-            else:
-                draws += 1
-
-        # Calculate percentages
-        total_games = p1_wins + p2_wins + draws
-        win_percentage = (p1_wins / total_games * 100) if total_games > 0 else 0
-        tie_percentage = (draws / total_games * 100) if total_games > 0 else 0
-
-        # Append results with percentages
-        results_tricks.append({
-            "Sequence 1": p1,
-            "Sequence 2": p2,
-            "Player 1 Wins": p1_wins,
-            "Player 2 Wins": p2_wins,
-            "Draws": draws,
-            "Player 1 Win %": round(win_percentage, 2),
-            "Tie %": round(tie_percentage, 2)  # New tie probability
-        })
-
-    # Convert results to Pandas DataFrames
-    results_cards_df = pd.DataFrame(results_cards)
-    results_tricks_df = pd.DataFrame(results_tricks)
-
-    # Ensure "Sequence 1" and "Sequence 2" are stored as strings
-    results_cards_df["Sequence 1"] = results_cards_df["Sequence 1"].astype(str)
-    results_cards_df["Sequence 2"] = results_cards_df["Sequence 2"].astype(str)
-
-    results_tricks_df["Sequence 1"] = results_tricks_df["Sequence 1"].astype(str)
-    results_tricks_df["Sequence 2"] = results_tricks_df["Sequence 2"].astype(str)
-
-    return results_cards_df, results_tricks_df
+    if os.path.exists(cards_file) and os.path.exists(tricks_file):
+        cards_data = pd.read_csv(cards_file, dtype={'Sequence 1': str, 'Sequence 2': str})
+        tricks_data = pd.read_csv(tricks_file, dtype={'Sequence 1': str, 'Sequence 2': str})
+        return cards_data, tricks_data
+    else:
+        return pd.DataFrame(), pd.DataFrame()

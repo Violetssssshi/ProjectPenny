@@ -41,7 +41,7 @@ def run_sim(
 
     # Step 3: Analyze all combinations of sequences
     print("Analyzing all combinations...")
-    cards_data, tricks_data = all_combinations(decks)
+    cards_data, tricks_data = all_combinations(decks, seed, append)
 
     # Step 4: Generate heatmaps
     print("Generating heatmaps...")

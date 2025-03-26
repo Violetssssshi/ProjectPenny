@@ -29,8 +29,17 @@ def generate_heatmaps(cards_data: pd.DataFrame, tricks_data: pd.DataFrame, filen
 
     # Replace '0' with 'B' and '1' with 'R' in sequences for display
     def replace_sequence(seq):
+        if isinstance(seq, int):
+            seq = format(seq, '03b')  # Convert int to binary string
         return seq.replace('0', 'B').replace('1', 'R')
+    
+    # Ensure "Sequence 1" and "Sequence 2" are strings of correct length
+    cards_data["Sequence 1"] = cards_data["Sequence 1"].apply(lambda x: format(x, '03b') if isinstance(x, int) else x)
+    cards_data["Sequence 2"] = cards_data["Sequence 2"].apply(lambda x: format(x, '03b') if isinstance(x, int) else x)
+    tricks_data["Sequence 1"] = tricks_data["Sequence 1"].apply(lambda x: format(x, '03b') if isinstance(x, int) else x)
+    tricks_data["Sequence 2"] = tricks_data["Sequence 2"].apply(lambda x: format(x, '03b') if isinstance(x, int) else x)
 
+    # Apply the replace_sequence function
     cards_data["Sequence 1"] = cards_data["Sequence 1"].apply(replace_sequence)
     cards_data["Sequence 2"] = cards_data["Sequence 2"].apply(replace_sequence)
     tricks_data["Sequence 1"] = tricks_data["Sequence 1"].apply(replace_sequence)
