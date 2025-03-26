@@ -36,43 +36,41 @@ def cards(decks: np.ndarray, player1_sequence: str, player2_sequence: str) -> tu
     Returns:
         tuple[np.ndarray, np.ndarray]: Two arrays containing the cards scores for Player 1 and Player 2 for each deck.
     """
-    # Initialize arrays to store scores for each deck
-    player1_scores = []
-    player2_scores = []
-
-    # Iterate over each deck in the array
-    for deck in decks:
-        player1_cards = 0
-        player2_cards = 0
-        pile = 0
+    # Convert decks to strings upfront for faster processing
+    deck_strings = [''.join(deck.astype(str)) for deck in decks]
+    seq_len = len(player1_sequence)
+    
+    # Preallocate score arrays
+    player1_scores = np.zeros(len(decks), dtype=int)
+    player2_scores = np.zeros(len(decks), dtype=int)
+    
+    for deck_idx, deck_str in enumerate(deck_strings):
         i = 0
-
-        # Traverse the deck while ensuring at least 3 cards remain
-        while i <= len(deck) - 2:
-            # Extract the current 3-character substring
-            substring = ''.join(map(str, deck[i:i+3]))
-            pile += 1
-
-            if substring == player1_sequence:
-                # Player 1 collects the pile
-                player1_cards = player1_cards + pile + 2 
+        pile = 0
+        p1_score = 0
+        p2_score = 0
+        n = len(deck_str)
+        
+        # Replicate original logic exactly
+        while i <= n - seq_len:
+            current_segment = deck_str[i:i+seq_len]
+            pile += 1  # Original behavior: increment pile for every triplet checked
+            
+            if current_segment == player1_sequence:
+                p1_score += pile + 2
                 pile = 0
-                i += 3  # Jump ahead by 3 to avoid overlapping
-            elif substring == player2_sequence:
-                # Player 2 collects the pile
-                player2_cards = player2_cards + pile + 2
+                i += seq_len  # Jump ahead after match
+            elif current_segment == player2_sequence:
+                p2_score += pile + 2
                 pile = 0
-                i += 3  # Jump ahead by 3 to avoid overlapping
+                i += seq_len  # Jump ahead after match
             else:
-                # No match, move to the next card
-                i += 1
-
-        # Append scores for this deck to the results lists
-        player1_scores.append(player1_cards)
-        player2_scores.append(player2_cards)
-
-    # Convert results to NumPy arrays and return them
-    return np.array(player1_scores), np.array(player2_scores)
+                i += 1  # Move to next position
+        
+        player1_scores[deck_idx] = p1_score
+        player2_scores[deck_idx] = p2_score
+    
+    return player1_scores, player2_scores
 
 
 
@@ -90,41 +88,41 @@ def tricks(decks: np.ndarray, player1_sequence: str, player2_sequence: str) -> t
     Returns:
         tuple[np.ndarray, np.ndarray]: Two arrays containing the trick counts for Player 1 and Player 2 for each deck.
     """
-    # Initialize arrays to store trick counts for each deck
-    player1_tricks = []
-    player2_tricks = []
-
-    # Iterate over each deck in the array
-    for deck in decks:
-        player1_trick_count = 0
-        player2_trick_count = 0
-        i = 0
-
-        # Traverse the deck while ensuring at least 3 cards remain
-        while i <= len(deck) - 3:
-            # Extract the current 3-character substring
-            substring = ''.join(map(str, deck[i:i+3]))
-
-            if substring == player1_sequence:
-                # Player 1 wins this trick
-                player1_trick_count += 1
-                i += 3  # Jump ahead by 3 to avoid overlapping
-            elif substring == player2_sequence:
-                # Player 2 wins this trick
-                player2_trick_count += 1
-                i += 3  # Jump ahead by 3 to avoid overlapping
+    # Convert all decks to strings upfront
+    deck_strings = [''.join(deck.astype(str)) for deck in decks]
+    
+    # Initialize arrays for results
+    player1_tricks = np.zeros(len(decks), dtype=int)
+    player2_tricks = np.zeros(len(decks), dtype=int)
+    
+    # Get sequence length (should be 3)
+    seq_len = len(player1_sequence)
+    
+    for deck_idx, deck_str in enumerate(deck_strings):
+        pos = 0
+        p1_count = 0
+        p2_count = 0
+        len_deck = len(deck_str)
+        
+        # Replicate original logic with string optimization
+        while pos <= len_deck - seq_len:
+            # Direct string slice comparison
+            current_segment = deck_str[pos:pos+seq_len]
+            
+            if current_segment == player1_sequence:
+                p1_count += 1
+                pos += seq_len  # Jump ahead after match
+            elif current_segment == player2_sequence:
+                p2_count += 1
+                pos += seq_len  # Jump ahead after match
             else:
-                # No match, move to the next card
-                i += 1
-
-        # Append trick counts for this deck to the results lists
-        player1_tricks.append(player1_trick_count)
-        player2_tricks.append(player2_trick_count)
-
-    # Convert results to NumPy arrays and return them
-    return np.array(player1_tricks), np.array(player2_tricks)
-
-
+                pos += 1  # Move to next position
+        
+        # Store results in preallocated arrays
+        player1_tricks[deck_idx] = p1_count
+        player2_tricks[deck_idx] = p2_count
+    
+    return player1_tricks, player2_tricks
 
 def all_combinations(decks: np.ndarray) -> tuple[pd.DataFrame, pd.DataFrame]:
     """

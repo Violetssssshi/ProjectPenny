@@ -6,7 +6,7 @@ import os
 def generate_heatmaps(cards_data: pd.DataFrame, tricks_data: pd.DataFrame, filename: str, vmin: float = 0, vmax: float = 100):
     """
     Generates two heatmaps for cards-based and tricks-based results with Player 1 on the x-axis and Player 2 on the y-axis.
-    Includes tie percentages in parentheses and saves the output as SVG files.
+    Includes tie percentages in parentheses, shows sample size in the title, and saves as SVG files.
 
     Parameters:
         cards_data (pd.DataFrame): DataFrame with cards-based simulation data.
@@ -20,6 +20,12 @@ def generate_heatmaps(cards_data: pd.DataFrame, tricks_data: pd.DataFrame, filen
     """
     # Ensure the output directory exists
     os.makedirs("figures", exist_ok=True)
+
+    # Calculate total number of samples (N) from the first row of cards_data
+    try:
+        n_samples = (cards_data["Player 1 Wins"] + cards_data["Player 2 Wins"] + cards_data["Draws"]).iloc[0]
+    except (KeyError, IndexError):
+        n_samples = 0  # Fallback if data is missing
 
     # Replace '0' with 'B' and '1' with 'R' in sequences for display
     def replace_sequence(seq):
@@ -54,7 +60,7 @@ def generate_heatmaps(cards_data: pd.DataFrame, tricks_data: pd.DataFrame, filen
     sns.heatmap(
         cards_heatmap_data,
         annot=cards_annotations.values,
-        fmt="",  
+        fmt="",
         cmap="Blues",
         vmin=vmin,
         vmax=vmax,
@@ -65,9 +71,13 @@ def generate_heatmaps(cards_data: pd.DataFrame, tricks_data: pd.DataFrame, filen
         cbar=False
     )
     ax_cards.set_facecolor('black')
-    ax_cards.set_title("Cards-Based Player 1 Winning Probabilities", fontsize=16)
-    ax_cards.set_xlabel("Player 1 Sequence", fontsize=12)  # Updated label
-    ax_cards.set_ylabel("Player 2 Sequence", fontsize=12)  # Updated label
+    
+    # Add title with dynamically calculated sample size
+    title_cards = f"Cards-Based Player 1 Winning Probabilities\nN = {n_samples:,}"
+    ax_cards.set_title(title_cards, fontsize=16)
+    
+    ax_cards.set_xlabel("Player 1 Sequence", fontsize=12)
+    ax_cards.set_ylabel("Player 2 Sequence", fontsize=12)
     
     # Rotate y-axis labels to horizontal
     ax_cards.set_yticklabels(
@@ -77,14 +87,14 @@ def generate_heatmaps(cards_data: pd.DataFrame, tricks_data: pd.DataFrame, filen
     )
     
     plt.tight_layout()
-    fig_cards.savefig(f"figures/{filename}_cards.svg", format="svg")  
+    fig_cards.savefig(f"figures/{filename}_cards.svg", format="svg")
 
     # Create and save the tricks-based heatmap
     fig_tricks, ax_tricks = plt.subplots(figsize=(10, 8))
     sns.heatmap(
         tricks_heatmap_data,
         annot=tricks_annotations.values,
-        fmt="",  
+        fmt="",
         cmap="Blues",
         vmin=vmin,
         vmax=vmax,
@@ -95,9 +105,13 @@ def generate_heatmaps(cards_data: pd.DataFrame, tricks_data: pd.DataFrame, filen
         cbar=False
     )
     ax_tricks.set_facecolor('black')
-    ax_tricks.set_title("Tricks-Based Player 1 Winning Probabilities", fontsize=16)
-    ax_tricks.set_xlabel("Player 1 Sequence", fontsize=12)  # Updated label
-    ax_tricks.set_ylabel("Player 2 Sequence", fontsize=12)  # Updated label
+    
+    # Add title with dynamically calculated sample size
+    title_tricks = f"Tricks-Based Player 1 Winning Probabilities\nN = {n_samples:,}"
+    ax_tricks.set_title(title_tricks, fontsize=16)
+    
+    ax_tricks.set_xlabel("Player 1 Sequence", fontsize=12)
+    ax_tricks.set_ylabel("Player 2 Sequence", fontsize=12)
     
     # Rotate y-axis labels to horizontal
     ax_tricks.set_yticklabels(
@@ -107,7 +121,6 @@ def generate_heatmaps(cards_data: pd.DataFrame, tricks_data: pd.DataFrame, filen
     )
     
     plt.tight_layout()
-    fig_tricks.savefig(f"figures/{filename}_tricks.svg", format="svg")  
+    fig_tricks.savefig(f"figures/{filename}_tricks.svg", format="svg")
 
     return fig_cards, fig_tricks
-
