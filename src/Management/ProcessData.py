@@ -2,25 +2,31 @@ import os
 import numpy as np
 import itertools
 import pandas as pd
+import glob
 from tqdm import tqdm
 
-def load_simulation(file_path: str) -> np.ndarray:
+def load_simulation(data_dir: str, seed: int) -> np.ndarray:
     """
-    Loads simulation data from a NumPy (.npy) file containing the decks.
+    Loads simulation data from multiple NumPy (.npy) files containing the decks.
 
     Parameters:
-        file_path (str): The path to the .npy file with the simulation data.
+        data_dir (str): The directory containing the .npy files.
+        seed (int): The seed used for the simulation.
 
     Returns:
-        np.ndarray: An array with all decks stored in the file.
+        np.ndarray: An array with all decks stored in the files.
     """
-    # Check if the file exists
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"The specified file '{file_path}' does not exist.")
+    file_pattern = f"{data_dir}/decks_{seed}_*.npy"
+    deck_files = sorted(glob.glob(file_pattern))
     
-    # Load and return the decks from the .npy file
-    decks = np.load(file_path)
-    return decks
+    if not deck_files:
+        raise FileNotFoundError(f"No deck files found for seed {seed} in directory '{data_dir}'.")
+    
+    decks = []
+    for file in deck_files:
+        decks.append(np.load(file))
+    
+    return np.concatenate(decks)
 
 
 def cards(decks: np.ndarray, player1_sequence: str, player2_sequence: str) -> tuple[np.ndarray, np.ndarray]:
@@ -124,17 +130,29 @@ def tricks(decks: np.ndarray, player1_sequence: str, player2_sequence: str) -> t
     
     return player1_tricks, player2_tricks
 
-def all_combinations(decks: np.ndarray, seed: int, append: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+def all_combinations(data_dir: str, seed: int, append: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Tests every possible pair of distinct 3-bit sequences for two players using both game variations (cards and tricks).
+    Aggregates outcomes across all the simulations provided.
+
+    Parameters:
+        data_dir (str): The directory containing the deck files.
+        seed (int): The seed used for the simulation.
+        append (bool): Whether to append to existing data or start fresh.
+
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame]: Two Pandas DataFrames containing aggregated results for the cards and tricks variations.
+    """
     if append:
         existing_cards, existing_tricks = load_scoring_data(seed)
-        existing_decks = load_processed_decks_count(seed)
-        new_decks = len(decks) - existing_decks
-        decks_to_process = decks[-new_decks:]
+        processed_decks = load_processed_decks_count(seed)
     else:
         existing_cards = pd.DataFrame(columns=['Sequence 1', 'Sequence 2', 'Player 1 Wins', 'Player 2 Wins', 'Draws', 'Player 1 Win %', 'Tie %'])
         existing_tricks = pd.DataFrame(columns=['Sequence 1', 'Sequence 2', 'Player 1 Wins', 'Player 2 Wins', 'Draws', 'Player 1 Win %', 'Tie %'])
-        existing_decks = 0
-        decks_to_process = decks
+        processed_decks = 0
+
+    decks = load_simulation(data_dir, seed)
+    new_decks = decks[processed_decks:]
 
     all_sequences = ['{:03b}'.format(i) for i in range(8)]
     new_cards_results = []
@@ -149,8 +167,8 @@ def all_combinations(decks: np.ndarray, seed: int, append: bool = False) -> tupl
                     p1_wins_cards, p2_wins_cards, draws_cards = 0, 0, 0
                     p1_wins_tricks, p2_wins_tricks, draws_tricks = 0, 0, 0
 
-                    p1_scores_cards, p2_scores_cards = cards(decks_to_process, p1, p2)
-                    p1_scores_tricks, p2_scores_tricks = tricks(decks_to_process, p1, p2)
+                    p1_scores_cards, p2_scores_cards = cards(new_decks, p1, p2)
+                    p1_scores_tricks, p2_scores_tricks = tricks(new_decks, p1, p2)
 
                     for s1, s2 in zip(p1_scores_cards, p2_scores_cards):
                         if s1 > s2:
@@ -199,7 +217,7 @@ def all_combinations(decks: np.ndarray, seed: int, append: bool = False) -> tupl
     final_cards = update_dataframe(existing_cards, new_cards_df)
     final_tricks = update_dataframe(existing_tricks, new_tricks_df)
 
-    total_decks = existing_decks + len(decks_to_process)
+    total_decks = processed_decks + len(new_decks)
     save_processed_decks_count(seed, total_decks)
     save_scoring_data(seed, final_cards, final_tricks)
 

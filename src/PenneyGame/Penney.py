@@ -33,17 +33,13 @@ def run_sim(
     """
     # Step 1: Generate shuffled decks
     print("Generating decks...")
-    deck_file_path = get_decks(n_decks, seed, half_deck_size, append)
+    data_dir = get_decks(n_decks, seed, half_deck_size, append)
 
-    # Step 2: Load generated decks
-    print("Loading decks...")
-    decks = load_simulation(deck_file_path)
-
-    # Step 3: Analyze all combinations of sequences
+    # Step 2: Analyze all combinations of sequences
     print("Analyzing all combinations...")
-    cards_data, tricks_data = all_combinations(decks, seed, append)
+    cards_data, tricks_data = all_combinations(data_dir, seed, append)
 
-    # Step 4: Generate heatmaps
+    # Step 3: Generate heatmaps
     print("Generating heatmaps...")
     fig_cards, fig_tricks = generate_heatmaps(cards_data, tricks_data, filename, vmin, vmax)
 
