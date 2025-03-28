@@ -38,7 +38,7 @@ def get_decks(n_decks: int,
         rng.bit_generator.state = saved_state  # Restore RNG state
         
         # Find existing deck files and determine the last file number
-        existing_files = sorted([f for f in os.listdir(data_dir) if f.startswith(f"decks_{seed}_") and f.endswith(".npy")])
+        existing_files = sorted([f for f in os.listdir(data_dir) if f.startswith(f"decks_{seed}_") and f.endswith(".npy")],key=lambda x: int(x.split("_")[-1].split(".")[0]))
         last_file_num = int(existing_files[-1].split("_")[-1].split(".")[0]) if existing_files else 0
         last_file_path = os.path.join(data_dir, existing_files[-1]) if existing_files else None
         
@@ -63,7 +63,7 @@ def get_decks(n_decks: int,
             rng.permuted(new_decks, axis=1, out=new_decks)  # Shuffle the decks
             
             # Combine with existing decks and save
-            file_path = os.path.join(data_dir, f"decks_{seed}_{last_file_num}.npy")
+            file_path = os.path.join(data_dir, f"decks_{seed}_{last_file_num:04d}.npy")
             existing_decks = np.load(file_path) if os.path.exists(file_path) else np.empty((0, half_deck_size * 2))
             combined_decks = np.concatenate((existing_decks, new_decks))
             np.save(file_path, combined_decks)
@@ -78,7 +78,7 @@ def get_decks(n_decks: int,
             rng.permuted(new_decks, axis=1, out=new_decks)  # Shuffle the decks
             
             # Save new decks to a new file
-            file_path = os.path.join(data_dir, f"decks_{seed}_{last_file_num}.npy")
+            file_path = os.path.join(data_dir, f"decks_{seed}_{last_file_num:04d}.npy")
             np.save(file_path, new_decks)
             
             decks_generated += batch_size

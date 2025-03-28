@@ -17,7 +17,11 @@ def load_simulation(data_dir: str, seed: int) -> np.ndarray:
         np.ndarray: An array with all decks stored in the files.
     """
     file_pattern = f"{data_dir}/decks_{seed}_*.npy"
-    deck_files = sorted(glob.glob(file_pattern))
+    deck_files = sorted(
+        glob.glob(file_pattern),
+        # Sort by numerical order of file index (0001, 0002, etc.)
+        key=lambda x: int(x.split("_")[-1].split(".")[0])  
+    )
     
     if not deck_files:
         raise FileNotFoundError(f"No deck files found for seed {seed} in directory '{data_dir}'.")
@@ -143,6 +147,8 @@ def all_combinations(data_dir: str, seed: int, append: bool = False) -> tuple[pd
     Returns:
         tuple[pd.DataFrame, pd.DataFrame]: Two Pandas DataFrames containing aggregated results for the cards and tricks variations.
     """
+
+    # Load existing data if appending, otherwise create empty DataFrames
     if append:
         existing_cards, existing_tricks = load_scoring_data(seed)
         processed_decks = load_processed_decks_count(seed)
@@ -151,25 +157,33 @@ def all_combinations(data_dir: str, seed: int, append: bool = False) -> tuple[pd
         existing_tricks = pd.DataFrame(columns=['Sequence 1', 'Sequence 2', 'Player 1 Wins', 'Player 2 Wins', 'Draws', 'Player 1 Win %', 'Tie %'])
         processed_decks = 0
 
-    decks = load_simulation(data_dir, seed)
-    new_decks = decks[processed_decks:]
+    # Load simulation data and get new decks
+    all_decks = load_simulation(data_dir, seed)
+    new_decks = all_decks[processed_decks:] if append else all_decks
 
+    print(f"Processing {len(new_decks)} new decks")
+
+    # Generate all possible 3-bit sequences
     all_sequences = ['{:03b}'.format(i) for i in range(8)]
     new_cards_results = []
     new_tricks_results = []
 
     total_iterations = len(all_sequences) * (len(all_sequences) - 1)
 
+    # Process all combinations of sequences
     with tqdm(total=total_iterations, desc="Processing Pairs") as pbar:
         for p1 in all_sequences:
             for p2 in all_sequences:
                 if p1 != p2:
+                    # Initialize counters for wins and draws
                     p1_wins_cards, p2_wins_cards, draws_cards = 0, 0, 0
                     p1_wins_tricks, p2_wins_tricks, draws_tricks = 0, 0, 0
 
+                     # Simulate games for cards and tricks
                     p1_scores_cards, p2_scores_cards = cards(new_decks, p1, p2)
                     p1_scores_tricks, p2_scores_tricks = tricks(new_decks, p1, p2)
 
+                     # Count wins and draws for cards game
                     for s1, s2 in zip(p1_scores_cards, p2_scores_cards):
                         if s1 > s2:
                             p1_wins_cards += 1
@@ -178,6 +192,7 @@ def all_combinations(data_dir: str, seed: int, append: bool = False) -> tuple[pd
                         else:
                             draws_cards += 1
 
+                    # Count wins and draws for tricks game
                     for s1, s2 in zip(p1_scores_tricks, p2_scores_tricks):
                         if s1 > s2:
                             p1_wins_tricks += 1
@@ -186,9 +201,11 @@ def all_combinations(data_dir: str, seed: int, append: bool = False) -> tuple[pd
                         else:
                             draws_tricks += 1
 
+                    # Calculate total games and percentages
                     total_games_cards = p1_wins_cards + p2_wins_cards + draws_cards
                     total_games_tricks = p1_wins_tricks + p2_wins_tricks + draws_tricks
 
+                    # Append results for games
                     new_cards_results.append({
                         'Sequence 1': p1,
                         'Sequence 2': p2,
@@ -214,9 +231,11 @@ def all_combinations(data_dir: str, seed: int, append: bool = False) -> tuple[pd
     new_cards_df = pd.DataFrame(new_cards_results)
     new_tricks_df = pd.DataFrame(new_tricks_results)
 
+    # Update existing data with new results
     final_cards = update_dataframe(existing_cards, new_cards_df)
     final_tricks = update_dataframe(existing_tricks, new_tricks_df)
 
+    # Save processed deck count and scoring data
     total_decks = processed_decks + len(new_decks)
     save_processed_decks_count(seed, total_decks)
     save_scoring_data(seed, final_cards, final_tricks)
@@ -225,6 +244,13 @@ def all_combinations(data_dir: str, seed: int, append: bool = False) -> tuple[pd
 
 
 def load_processed_decks_count(seed: int) -> int:
+    """
+    Save the count of processed decks for a given seed.
+
+    Parameters:
+        seed (int): The seed used for the simulation.
+        count (int): The number of processed decks to save.
+    """
     count_file = f"data/processed_decks_count_{seed}.txt"
     if os.path.exists(count_file):
         with open(count_file, 'r') as f:
@@ -232,22 +258,43 @@ def load_processed_decks_count(seed: int) -> int:
     return 0
 
 def save_processed_decks_count(seed: int, count: int):
+    """
+    Save the count of processed decks for a given seed.
+
+    Parameters:
+        seed (int): The seed used for the simulation.
+        count (int): The number of processed decks to save.
+    """
     count_file = f"data/processed_decks_count_{seed}.txt"
     with open(count_file, 'w') as f:
         f.write(str(count))
+    print(f"Saved processed count: {count}")
 
 
 def update_dataframe(existing_df: pd.DataFrame, new_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Update an existing DataFrame with new data, recalculating percentages.
+
+    Parameters:
+        existing_df (pd.DataFrame): The existing DataFrame to update.
+        new_df (pd.DataFrame): The new DataFrame with data to add.
+
+    Returns:
+        pd.DataFrame: The updated DataFrame.
+    """
     if existing_df.empty:
         return new_df
 
+    # Ensure sequences are 3 digits
     existing_df['Sequence 1'] = existing_df['Sequence 1'].apply(lambda x: x.zfill(3))
     existing_df['Sequence 2'] = existing_df['Sequence 2'].apply(lambda x: x.zfill(3))
 
+    # Add new wins and draws to existing data
     existing_df['Player 1 Wins'] += new_df['Player 1 Wins']
     existing_df['Player 2 Wins'] += new_df['Player 2 Wins']
     existing_df['Draws'] += new_df['Draws']
 
+    # Recalculate percentages
     total_games = existing_df['Player 1 Wins'] + existing_df['Player 2 Wins'] + existing_df['Draws']
     existing_df['Player 1 Win %'] = (existing_df['Player 1 Wins'] / total_games * 100).fillna(0).round(2)
     existing_df['Tie %'] = (existing_df['Draws'] / total_games * 100).fillna(0).round(2)
@@ -255,11 +302,22 @@ def update_dataframe(existing_df: pd.DataFrame, new_df: pd.DataFrame) -> pd.Data
     return existing_df
 
 def save_scoring_data(seed: int, cards_data: pd.DataFrame, tricks_data: pd.DataFrame):
+    """
+    Save scoring data for cards and tricks games to CSV files.
+
+    Parameters:
+        seed (int): The seed used for the simulation.
+        cards_data (pd.DataFrame): DataFrame containing cards game results.
+        tricks_data (pd.DataFrame): DataFrame containing tricks game results.
+    """
     os.makedirs("data", exist_ok=True)
     cards_data.to_csv(f"data/scoring_cards_{seed}.csv", index=False)
     tricks_data.to_csv(f"data/scoring_tricks_{seed}.csv", index=False)
 
 def load_scoring_data(seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Load the scoring data based on seed
+    """
     cards_file = f"data/scoring_cards_{seed}.csv"
     tricks_file = f"data/scoring_tricks_{seed}.csv"
     
