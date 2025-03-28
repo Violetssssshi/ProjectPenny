@@ -3,11 +3,10 @@ name = "projectpenny"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12.9"
 dependencies = [
-    "datetime>=5.5",
     "matplotlib>=3.10.1",
-    "numpy>=2.2.3",
+    "numpy>=2.2.4",
     "pandas>=2.2.3",
     "seaborn>=0.13.2",
 ]
